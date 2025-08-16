@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% if msgs %}
+    <div class="flash-wrap">
+        {% for cat, m in msgs %}
+        <div class="flash {{cat}}">{{ m }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <h2>Admin Dashboard</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>ID No</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Email</th>
+            <th>Type</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+        {% for req in leave_requests %}
+        <tr>
+            <td>{{ req.id }}</td>
+            <td>{{ req.name }}</td>
+            <td>{{ req.idno }}</td>
+            <td>{{ req.fromdate }}</td>
+            <td>{{ req.todate }}</td>
+            <td>{{ req.email }}</td>
+            <td>{{ req.type }}</td>
+            <td>{{ req.reason }}</td>
+            <td>{{ req.status }}</td>
+            <td>
+                {% if req.status == "Pending" %}
+                <form method="POST" style="display:inline;">
+                    <input type="hidden" name="id" value="{{ req.id }}">
+                    <input type="hidden" name="action" value="Approved">
+                    <button type="submit">Approve</button>
+                </form>
+                <form method="POST" style="display:inline;">
+                    <input type="hidden" name="id" value="{{ req.id }}">
+                    <input type="hidden" name="action" value="Rejected">
+                    <button type="submit">Reject</button>
+                </form>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

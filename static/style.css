@@ -1,0 +1,95 @@
+/* Reset */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* Body */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    text-align: center;
+    padding: 20px;
+}
+
+/* Headings */
+h1, h2 { margin-bottom: 20px; }
+
+/* Flash messages */
+.flash-wrap { max-width: 700px; margin: 0 auto 20px; }
+.flash {
+    padding: 10px 14px; border-radius: 6px; margin-bottom: 8px;
+    text-align: left; background: #eef; border: 1px solid #ccd;
+}
+.flash.error { background: #ffecec; border-color: #ffb3b3; }
+.flash.success { background: #eaffea; border-color: #b7e1b7; }
+
+/* Navigation links */
+nav { margin: 20px 0; }
+nav a {
+    display: inline-block;
+    margin: 0 10px;
+    text-decoration: none;
+    color: white;
+    font-weight: bold;
+    background-color: #4CAF50;
+    padding: 12px 25px;
+    border-radius: 8px;
+    transition: 0.3s;
+}
+nav a:hover { background-color: #45a049; }
+
+/* Containers */
+.leave-form-container,
+.index-container {
+    width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    text-align: left;
+}
+
+/* Forms */
+.leave-form { display: flex; flex-direction: column; }
+.leave-form label { margin-bottom: 5px; }
+.leave-form input,
+.leave-form select,
+.leave-form textarea,
+.leave-form button {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.leave-form textarea { min-height: 100px; }
+.leave-form button {
+    background-color: black; color: white; border: none; cursor: pointer;
+}
+.leave-form button:hover { background-color: #333; }
+
+/* Table */
+table {
+    margin: 20px auto;
+    border-collapse: collapse;
+    width: 95%;
+    background: white;
+}
+table th, table td { padding: 10px; border: 1px solid #ccc; }
+table th { background-color: #f0f0f0; }
+
+/* Links */
+a { color: blue; }
+a:hover { text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 600px) {
+    .leave-form-container, .index-container { width: 90%; padding: 20px; }
+    nav a { display: block; margin: 10px 0; width: 80%; text-align: center; }
+}
+@media (min-width: 601px) and (max-width: 992px) {
+    .leave-form-container, .index-container { width: 70%; padding: 30px; }
+}
+@media (min-width: 993px) {
+    .leave-form-container, .index-container { width: 400px; padding: 40px; }
+}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Apply for Leave</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% if msgs %}
+    <div class="flash-wrap">
+        {% for cat, m in msgs %}
+        <div class="flash {{cat}}">{{ m }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="leave-form-container">
+        <h2>Leave Request Form</h2>
+        <form method="POST" class="leave-form">
+            <label>Name:</label>
+            <input type="text" name="name" required>
+
+            <label>ID No:</label>
+            <input type="text" name="idno" required>
+
+            <label>From Date:</label>
+            <input type="date" name="fromdate" required>
+
+            <label>To Date:</label>
+            <input type="date" name="todate" required>
+
+            <label>Email:</label>
+            <input type="email" name="email" required>
+
+            <label>Type of Leave:</label>
+            <select name="type" required>
+                <option value="Sick">Sick</option>
+                <option value="Casual">Casual</option>
+                <option value="Emergency">Emergency</option>
+            </select>
+
+            <label>Reason:</label>
+            <textarea name="reason" required></textarea>
+
+            <button type="submit">Submit</button>
+        </form>
+        <br>
+        <a href="{{ url_for('home') }}">Back to Home</a>
+    </div>
+</body>
+</html>
