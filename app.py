@@ -13,8 +13,8 @@ from flask_sqlalchemy import SQLAlchemy
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
 
-# Secret key (sessions)
-app.secret_key = os.environ.get("SECRET_KEY", "change-me-please")
+# Secret key (used for sessions & security) -> set in environment
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
 # SQLite DB (file-based, simple and works for demos)
 DB_PATH = os.environ.get("DATABASE_URL", "sqlite:///leaves.db")
@@ -23,13 +23,13 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-# Admin credentials (set these as env vars in Render)
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "rushi")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "RushithaIAS@99")
+# Admin credentials (stored in environment, safer than hardcoding)
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 
-# Optional email settings (use Gmail App Passwords)
-EMAIL_USER = os.environ.get("rushithapakanati5@gmail.com")          # e.g. yourgmail@gmail.com
-EMAIL_PASS = os.environ.get("dxlv tpgb fret mncb")          # e.g. abcd efgh ijkl mnop (App Password)
+# Email credentials (set Gmail app password in env)
+EMAIL_USER = os.environ.get("EMAIL_USER")
+EMAIL_PASS = os.environ.get("EMAIL_PASS")
 
 # -----------------------------------------------------------------------------
 # DB Model
@@ -53,7 +53,7 @@ with app.app_context():
 # Helpers
 # -----------------------------------------------------------------------------
 def send_email(to_email: str, subject: str, body: str) -> None:
-    """Send email if EMAIL_USER and EMAIL_PASS are configured. Otherwise skip."""
+    """Send email if EMAIL_USER and EMAIL_PASS are configured."""
     if not EMAIL_USER or not EMAIL_PASS:
         app.logger.warning("Email creds not set; skipping email to %s", to_email)
         return
@@ -120,8 +120,8 @@ def leave():
 @app.route("/admin_login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "POST":
-        username = request.form.get("rushi")
-        password = request.form.get("RushithaIAS@99")
+        username = request.form.get("username")
+        password = request.form.get("password")
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["admin"] = True
             return redirect(url_for("admin_dashboard"))
@@ -159,15 +159,6 @@ def logout():
 # -----------------------------------------------------------------------------
 # Entry
 # -----------------------------------------------------------------------------
-import os
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render gives PORT=10000
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT'))
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS') == 'True'
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
