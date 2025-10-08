@@ -1,13 +1,16 @@
 from flask import Flask, render_template, request, redirect, flash, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, TextAreaField
+from wtforms import StringField, SubmitField, TextAreaField, PasswordField
 from wtforms.validators import DataRequired, Email
 import os
 import requests
 
+# ------------------- APP CONFIG -------------------
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
+
+# ✅ Use SQLite database (persistent file)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///leaves.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -20,6 +23,12 @@ class Leave(db.Model):
     student_name = db.Column(db.String(100), nullable=False)
     leave_reason = db.Column(db.String(300), nullable=False)
 
+# Optional: Admin table for scalability
+class Admin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+
 # ------------------- FORMS -------------------
 class LeaveForm(FlaskForm):
     student_id = StringField('Student ID', validators=[DataRequired()])
@@ -29,7 +38,7 @@ class LeaveForm(FlaskForm):
 
 class AdminLoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
-    password = StringField('Password', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
 
 # ------------------- ROUTES -------------------
@@ -48,7 +57,7 @@ def leave():
         )
         db.session.add(new_leave)
         db.session.commit()
-        flash("Leave applied successfully!", "success")
+        flash("✅ Leave applied successfully!", "success")
         return redirect(url_for('index'))
     return render_template('leave.html', form=form)
 
@@ -56,10 +65,11 @@ def leave():
 def admin_login():
     form = AdminLoginForm()
     if form.validate_on_submit():
-        if form.username.data == 'admin' and form.password.data == 'admin123':
+        admin = Admin.query.filter_by(username=form.username.data).first()
+        if admin and admin.password == form.password.data:
             return redirect(url_for('admin_dashboard'))
         else:
-            flash("Invalid credentials!", "danger")
+            flash("❌ Invalid credentials!", "danger")
     return render_template('admin_login.html', form=form)
 
 @app.route('/admin', methods=['GET', 'POST'])
@@ -69,7 +79,7 @@ def admin_dashboard():
         leave_id = request.form.get('leave_id')
         student_email = request.form.get('email')
         send_email(student_email, "Leave Approved", "Your leave has been approved by Admin.")
-        flash("Email sent successfully!", "success")
+        flash("📩 Email sent successfully!", "success")
     return render_template('admin.html', leaves=leaves)
 
 # ------------------- SEND EMAIL FUNCTION -------------------
@@ -78,7 +88,7 @@ def send_email(to_email, subject, content):
     sender_email = os.environ.get('SENDER_EMAIL')
     
     if not api_key or not sender_email:
-        print("SendGrid API key or sender email missing.")
+        print("⚠️ SendGrid API key or sender email missing.")
         return
 
     url = "https://api.sendgrid.com/v3/mail/send"
@@ -103,4 +113,12 @@ def send_email(to_email, subject, content):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+
+        # ✅ Ensure admin account exists
+        if not Admin.query.filter_by(username='admin').first():
+            default_admin = Admin(username='admin', password='admin123')
+            db.session.add(default_admin)
+            db.session.commit()
+            print("✅ Default admin created (username: admin, password: admin123)")
+
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
