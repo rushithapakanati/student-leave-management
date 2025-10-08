@@ -1,190 +1,106 @@
+from flask import Flask, render_template, request, redirect, flash, url_for
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Email
 import os
 import requests
-from email.message import EmailMessage
-from datetime import datetime
-from flask import (
-    Flask, render_template, request, redirect, url_for, session, flash
-)
-from flask_sqlalchemy import SQLAlchemy
 
-# -----------------------------------------------------------------------------
-# Configuration
-# -----------------------------------------------------------------------------
 app = Flask(__name__)
-
-# Secret key (used for sessions & security)
-app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
-
-# SQLite DB (simple and works well for Render)
-DB_PATH = os.environ.get("DATABASE_URL", "sqlite:///leaves.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = DB_PATH
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config['SECRET_KEY'] = 'your_secret_key'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///leaves.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Admin credentials (set via Render environment variables)
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
-
-# -----------------------------------------------------------------------------
-# Database Model
-# -----------------------------------------------------------------------------
-class LeaveRequest(db.Model):
+# ------------------- DATABASE MODELS -------------------
+class Leave(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    idno = db.Column(db.String(60), nullable=False)
-    fromdate = db.Column(db.String(20), nullable=False)
-    todate = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(200), nullable=False)
-    type = db.Column(db.String(50), nullable=False)
-    reason = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default="Pending")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    student_id = db.Column(db.String(50), nullable=False)
+    student_name = db.Column(db.String(100), nullable=False)
+    leave_reason = db.Column(db.String(300), nullable=False)
 
-# Create tables if they don't exist
-with app.app_context():
-    db.create_all()
+# ------------------- FORMS -------------------
+class LeaveForm(FlaskForm):
+    student_id = StringField('Student ID', validators=[DataRequired()])
+    student_name = StringField('Student Name', validators=[DataRequired()])
+    leave_reason = TextAreaField('Reason', validators=[DataRequired()])
+    submit = SubmitField('Apply Leave')
 
-# -----------------------------------------------------------------------------
-# Helper: Send Email (Render-Friendly using SendGrid)
-# -----------------------------------------------------------------------------
-def send_email(to_email: str, subject: str, body: str):
-    """Send email using SendGrid API (works on Render)."""
-    SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-    if not SENDGRID_API_KEY:
-        app.logger.error("Missing SENDGRID_API_KEY environment variable.")
+class AdminLoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = StringField('Password', validators=[DataRequired()])
+    submit = SubmitField('Login')
+
+# ------------------- ROUTES -------------------
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/leave', methods=['GET', 'POST'])
+def leave():
+    form = LeaveForm()
+    if form.validate_on_submit():
+        new_leave = Leave(
+            student_id=form.student_id.data,
+            student_name=form.student_name.data,
+            leave_reason=form.leave_reason.data
+        )
+        db.session.add(new_leave)
+        db.session.commit()
+        flash("Leave applied successfully!", "success")
+        return redirect(url_for('index'))
+    return render_template('leave.html', form=form)
+
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    form = AdminLoginForm()
+    if form.validate_on_submit():
+        if form.username.data == 'admin' and form.password.data == 'admin123':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash("Invalid credentials!", "danger")
+    return render_template('admin_login.html', form=form)
+
+@app.route('/admin', methods=['GET', 'POST'])
+def admin_dashboard():
+    leaves = Leave.query.all()
+    if request.method == 'POST':
+        leave_id = request.form.get('leave_id')
+        student_email = request.form.get('email')
+        send_email(student_email, "Leave Approved", "Your leave has been approved by Admin.")
+        flash("Email sent successfully!", "success")
+    return render_template('admin.html', leaves=leaves)
+
+# ------------------- SEND EMAIL FUNCTION -------------------
+def send_email(to_email, subject, content):
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    sender_email = os.environ.get('SENDER_EMAIL')
+    
+    if not api_key or not sender_email:
+        print("SendGrid API key or sender email missing.")
         return
 
-    try:
-        response = requests.post(
-            "https://api.sendgrid.com/v3/mail/send",
-            headers={
-                "Authorization": f"Bearer {SENDGRID_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "personalizations": [{"to": [{"email": to_email}]}],
-                "from": {"email": "student.leave.system@gmail.com", "name": "Leave Management Admin"},
-                "subject": subject,
-                "content": [{"type": "text/plain", "value": body}],
-            },
-        )
+    url = "https://api.sendgrid.com/v3/mail/send"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": sender_email},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": content}]
+    }
 
-        if 200 <= response.status_code < 300:
-            app.logger.info(f"✅ Email sent to {to_email}")
-        else:
-            app.logger.error(f"❌ Email failed ({response.status_code}): {response.text}")
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code != 202:
+        print(f"❌ Email failed ({response.status_code}): {response.text}")
+    else:
+        print("✅ Email sent successfully")
 
-    except Exception as e:
-        app.logger.error(f"SendGrid email error: {e}")
-
-# -----------------------------------------------------------------------------
-# Helper: Check Admin Session
-# -----------------------------------------------------------------------------
-def is_admin():
-    return session.get("admin", False)
-
-# -----------------------------------------------------------------------------
-# Routes
-# -----------------------------------------------------------------------------
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-# ---------------------------------------------------------------------
-# Leave Request Form
-# ---------------------------------------------------------------------
-@app.route("/leave", methods=["GET", "POST"])
-def leave():
-    if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        idno = request.form.get("idno", "").strip()
-        fromdate = request.form.get("fromdate", "").strip()
-        todate = request.form.get("todate", "").strip()
-        email = request.form.get("email", "").strip()
-        type_of_leave = request.form.get("type", "").strip()
-        reason = request.form.get("reason", "").strip()
-
-        if not all([name, idno, fromdate, todate, email, type_of_leave, reason]):
-            flash("⚠️ Please fill all fields.", "error")
-            return render_template("leave.html")
-
-        req = LeaveRequest(
-            name=name,
-            idno=idno,
-            fromdate=fromdate,
-            todate=todate,
-            email=email,
-            type=type_of_leave,
-            reason=reason,
-            status="Pending",
-        )
-        db.session.add(req)
-        db.session.commit()
-
-        flash("✅ Leave request submitted successfully!", "success")
-        return redirect(url_for("home"))
-
-    return render_template("leave.html")
-
-# ---------------------------------------------------------------------
-# Admin Login
-# ---------------------------------------------------------------------
-@app.route("/admin_login", methods=["GET", "POST"])
-def admin_login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session["admin"] = True
-            return redirect(url_for("admin_dashboard"))
-        flash("❌ Invalid username or password", "error")
-    return render_template("admin_login.html")
-
-# ---------------------------------------------------------------------
-# Admin Dashboard
-# ---------------------------------------------------------------------
-@app.route("/admin", methods=["GET", "POST"])
-def admin_dashboard():
-    if not is_admin():
-        return redirect(url_for("admin_login"))
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        rid = request.form.get("id")
-
-        req = LeaveRequest.query.get(int(rid))
-        if req and action in {"Approved", "Rejected"}:
-            req.status = action
-            db.session.commit()
-
-            # Notify student via email
-            subject = f"Leave Request {action}"
-            body = (
-                f"Hello {req.name},\n\n"
-                f"Your leave request (from {req.fromdate} to {req.todate}) "
-                f"has been {action}.\n\n"
-                "Regards,\nAdmin\nLeave Management System"
-            )
-            send_email(req.email, subject, body)
-            flash(f"Request #{req.id} marked as {action}.", "success")
-        else:
-            flash("⚠️ Invalid request or action.", "error")
-
-    leave_requests = LeaveRequest.query.order_by(LeaveRequest.created_at.desc()).all()
-    return render_template("admin.html", leave_requests=leave_requests)
-
-# ---------------------------------------------------------------------
-# Logout
-# ---------------------------------------------------------------------
-@app.route("/logout")
-def logout():
-    session.pop("admin", None)
-    return redirect(url_for("home"))
-
-# -----------------------------------------------------------------------------
-# Entry Point
-# -----------------------------------------------------------------------------
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+# ------------------- MAIN -------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
